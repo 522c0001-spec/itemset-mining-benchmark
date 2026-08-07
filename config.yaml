@@ -1,8 +1,8 @@
-experiment_name: "Initial_Apriori_Test"
+experiment_name: "Support_0.4"
 dataset_path: "data/chess.txt"
 algorithms:
   - "Apriori"
   - "FPGrowth"
   - "ECLAT"
-min_support: 0.85
+min_support: 0.4
 output_format: "csv"

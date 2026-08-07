@@ -1,0 +1,10 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="BenchmarkPlatform:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/BenchmarkPlatform_jar</output-path>
+    <root id="archive" name="BenchmarkPlatform.jar">
+      <element id="module-output" name="BenchmarkPlatform" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/libs/snakeyaml-2.6.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/libs/spmf.jar" path-in-jar="/" />
+    </root>
+  </artifact>
+</component>
