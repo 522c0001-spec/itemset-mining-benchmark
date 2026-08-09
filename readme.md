@@ -1,5 +1,6 @@
 # Frequent Itemset Mining Benchmark Platform
-
+> **HOW TO DOWNLOAD:** 
+> Please go to the **[Releases page](../../releases/latest)** (or click "Releases" on the right sidebar) and download the `.zip` file. It contains the compiled `.jar` and all necessary files ready to run. (You only need the prerequisites listed below such as JDK 26 and Python along with its dependencies.
 ## Prerequisites
 - **Java Development Kit (JDK) 26:** This artifact was compiled using OpenJDK 26.0.1. You must use Java 26 or higher to execute the `.jar` file.
 - **Python 3.8+** (Dependencies: `pip install pandas matplotlib seaborn openpyxl`)
