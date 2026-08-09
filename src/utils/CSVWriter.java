@@ -11,9 +11,6 @@ public class CSVWriter {
 
     private final String defaultOutputPath = "output/results.csv";
 
-    /**
-     * Appends a single benchmark result as a new row in the CSV file.
-     */
     public void writeResult(String experimentName, String dataset, Map<String, Object> metrics) {
         if (metrics == null || metrics.isEmpty()) {
             System.err.println("Warning: No metrics to write. Skipping CSV export.");
@@ -23,28 +20,33 @@ public class CSVWriter {
         File file = new File(defaultOutputPath);
         boolean isNewFile = !file.exists();
 
-        // Use FileWriter with 'true' to enable append mode
         try (FileWriter fw = new FileWriter(file, true);
              BufferedWriter bw = new BufferedWriter(fw);
              PrintWriter out = new PrintWriter(bw)) {
 
-            // If the file is brand new, write the column headers first
             if (isNewFile) {
-                out.println("Experiment_Name,Dataset,Algorithm,Min_Support,Execution_Time_ms,Memory_Used_MB");
+                out.println("Experiment_Name,Dataset,Algorithm,MinSupport,Execution_Time_ms,Memory_Used_MB,Itemset_Count");
             }
 
-            // Extract the data from the metrics map
-            String algorithm = (String) metrics.get("algorithm");
+            String algorithm = (String) metrics.get("Algorithm");
+            if (algorithm == null) algorithm = (String) metrics.get("algorithm");
+
             long executionTime = (Long) metrics.get("executionTime");
             double memoryMB = (Double) metrics.get("memoryMB");
 
-            out.printf("%s,%s,%s,%.2f,%d,%.2f\n",
+            Double minSupport = (Double) metrics.get("MinSupport");
+            if (minSupport == null) minSupport = 0.0;
+
+            long itemsetCount = (Long) metrics.getOrDefault("itemsetCount", 0L);
+
+            out.printf("%s,%s,%s,%.2f,%d,%.2f,%d\n",
                     experimentName,
                     dataset,
                     algorithm,
-                    0.0, // We will update this to dynamic minSupport in the main loop
+                    minSupport,
                     executionTime,
-                    memoryMB);
+                    memoryMB,
+                    itemsetCount);
 
             System.out.println("    [+] Results successfully saved to " + defaultOutputPath);
 

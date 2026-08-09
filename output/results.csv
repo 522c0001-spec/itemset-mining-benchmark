@@ -1,7 +1,0 @@
-Experiment_Name,Dataset,Algorithm,Min_Support,Execution_Time_ms,Memory_Used_MB
-Support_0.8,data/chess.txt,Apriori,0.00,1636,3.20
-Support_0.8,data/chess.txt,FPGrowth,0.00,81,2.40
-Support_0.8,data/chess.txt,ECLAT,0.00,562,192.39
-Support_0.6,data/chess.txt,Apriori,0.00,43490,5.20
-Support_0.6,data/chess.txt,FPGrowth,0.00,483,13.34
-Support_0.6,data/chess.txt,ECLAT,0.00,9742,14.24

@@ -1,27 +1,35 @@
 package core;
+
 import ca.pfv.spmf.algorithms.frequentpatterns.apriori_simple.AlgoApriori;
 import ca.pfv.spmf.algorithms.frequentpatterns.eclat.AlgoEclat;
 import ca.pfv.spmf.algorithms.frequentpatterns.fpgrowth.AlgoFPGrowth;
 import ca.pfv.spmf.input.transaction_database_list_integers.TransactionDatabase;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.util.HashMap;
 import java.util.Map;
+
+// Import the Sun-specific bean for thread-level allocation tracking
+import com.sun.management.ThreadMXBean;
 
 public class AlgorithmRunner {
 
     /**
      * Executes a specific data mining algorithm and records its performance.
-     * Returns a Map containing the execution time and memory used.
+     * Returns a Map containing the execution time, memory used, and itemsets mined.
      */
     public Map<String, Object> runAlgorithm(String algorithmName, String inputPath, String outputPath, double minSupport) {
         System.out.println("\n* Initializing: " + algorithmName + " (Min Support: " + minSupport + ")");
 
-        // Force Java to dump unneeded memory before testing
-        System.gc();
+        System.gc(); // Optional safeguard, though less critical now with ThreadMXBean
 
-        Runtime runtime = Runtime.getRuntime();
-        long startMemory = runtime.totalMemory() - runtime.freeMemory();
+        // 1. Setup ThreadMXBean to completely isolate memory tracking from the GC
+        ThreadMXBean threadBean = (ThreadMXBean) ManagementFactory.getThreadMXBean();
+        long threadId = Thread.currentThread().getId();
+        long startMemory = threadBean.getThreadAllocatedBytes(threadId);
 
         // Start the Stopwatch
         long startTime = System.currentTimeMillis();
@@ -30,7 +38,6 @@ public class AlgorithmRunner {
             // The Execution Switchboard
             if (algorithmName.equalsIgnoreCase("Apriori")) {
                 AlgoApriori apriori = new AlgoApriori();
-                // SPMF Apriori takes minSupport as a percentage (e.g., 0.4)
                 apriori.runAlgorithm(minSupport, inputPath, outputPath);
             }
             else if (algorithmName.equalsIgnoreCase("FPGrowth")) {
@@ -38,11 +45,9 @@ public class AlgorithmRunner {
                 fpGrowth.runAlgorithm(inputPath, outputPath, minSupport);
             }
             else if (algorithmName.equalsIgnoreCase("ECLAT")) {
-                // Convert raw text file into a Database object first
                 TransactionDatabase database = new TransactionDatabase();
                 database.loadFile(inputPath);
 
-                // Run Éclat with the 4 required arguments (Output, Database, MinSupport, SaveTIDs)
                 AlgoEclat eclat = new AlgoEclat();
                 eclat.runAlgorithm(outputPath, database, minSupport, false);
             }
@@ -55,22 +60,31 @@ public class AlgorithmRunner {
             long endTime = System.currentTimeMillis();
             long executionTime = endTime - startTime;
 
-            // Calculate the Memory Footprint
-            long endMemory = runtime.totalMemory() - runtime.freeMemory();
+            // 2. Calculate ThreadMXBean Memory
+            long endMemory = threadBean.getThreadAllocatedBytes(threadId);
             long memoryUsedBytes = endMemory - startMemory;
 
-            // Convert bytes to Megabytes for readability.
-            // If negative (due to background GC), default to 0.
-            double memoryUsedMB = Math.max(0, memoryUsedBytes / (1024.0 * 1024.0));
+            // We no longer need Math.max() because allocated bytes strictly increases
+            double memoryUsedMB = memoryUsedBytes / (1024.0 * 1024.0);
+
+            // 3. Count the number of mined itemsets
+            long itemsetCount = 0;
+            try (BufferedReader reader = new BufferedReader(new FileReader(outputPath))) {
+                while (reader.readLine() != null) {
+                    itemsetCount++;
+                }
+            }
 
             System.out.println("    [-] Execution Time: " + executionTime + " ms");
             System.out.printf("    [-] Memory Consumed: %.2f MB\n", memoryUsedMB);
+            System.out.println("    [-] Itemsets Found: " + itemsetCount);
 
             // Package the results to send to CSV Writer
             Map<String, Object> metrics = new HashMap<>();
             metrics.put("algorithm", algorithmName);
             metrics.put("executionTime", executionTime);
             metrics.put("memoryMB", memoryUsedMB);
+            metrics.put("itemsetCount", itemsetCount);
 
             return metrics;
 

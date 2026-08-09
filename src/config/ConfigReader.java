@@ -14,34 +14,39 @@ public class ConfigReader {
         Yaml yaml = new Yaml();
 
         try (InputStream inputStream = new FileInputStream("config.yaml")) {
-            // Read the YAML Configuration
             Map<String, Object> config = yaml.load(inputStream);
             String experimentName = (String) config.get("experiment_name");
             String datasetPath = (String) config.get("dataset_path");
-            Double minSupport = (Double) config.get("min_support");
+            
+            // FIX 1: Read a list of supports instead of a single Double
+            @SuppressWarnings("unchecked")
+            List<Double> minSupports = (List<Double>) config.get("min_supports");
 
             @SuppressWarnings("unchecked")
             List<String> algorithms = (List<String>) config.get("algorithms");
 
             System.out.println("=====================================");
-            System.out.println("BENCHMARK PLATFORM - STARTING RUN");
+            System.out.println("BENCHMARK PLATFORM - STARTING BATCH RUN");
             System.out.println("=====================================");
 
-            // Call Engine and Exporter
             AlgorithmRunner runner = new AlgorithmRunner();
             CSVWriter writer = new CSVWriter();
-
-            // Path and names
             String rawOutputPath = "output/raw_itemsets.txt";
 
-            // Main execution loop
-            for (String algo : algorithms) {
-                // Run the math and capture the time/memory
-                Map<String, Object> metrics = runner.runAlgorithm(algo, datasetPath, rawOutputPath, minSupport);
+            // FIX 2: Nested loop to run all algorithms across all supports
+            for (Double minSupport : minSupports) {
+                for (String algo : algorithms) {
+                    System.out.println("Testing " + algo + " at Support: " + minSupport);
+                    
+                    Map<String, Object> metrics = runner.runAlgorithm(algo, datasetPath, rawOutputPath, minSupport);
 
-                // If successful, save it to the CSV
-                if (metrics != null) {
-                    writer.writeResult(experimentName, datasetPath, metrics);
+                    if (metrics != null) {
+                        // FIX 3: Inject MinSupport and Algorithm so CSVWriter catches it
+                        metrics.put("Algorithm", algo);
+                        metrics.put("MinSupport", minSupport);
+                        
+                        writer.writeResult(experimentName, datasetPath, metrics);
+                    }
                 }
             }
 
@@ -50,7 +55,7 @@ public class ConfigReader {
             System.out.println("=====================================");
 
         } catch (Exception e) {
-            System.err.println("CRITICAL ERROR: Failed to execute platform.");
+            System.err.println("CRITICAL ERROR: Failure to execute platform.");
             System.err.println("Details: " + e.getMessage());
         }
     }
