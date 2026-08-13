@@ -54,9 +54,6 @@ def generate_dynamic_charts(df):
             
         print(f"  -> Rendering charts for: {dataset_name}")
 
-        # ---------------------------------------------------------
-        # 1. Execution Time Chart
-        # ---------------------------------------------------------
         plt.figure(figsize=(9, 6))
         for algo in target_algos:
             algo_df = dataset_df[dataset_df["Algorithm"].str.contains(algo, case=False, na=False)]
@@ -76,9 +73,6 @@ def generate_dynamic_charts(df):
         plt.savefig(os.path.join("output", f"execution_time_line_{dataset_name}.pdf"), dpi=300, bbox_inches="tight")
         plt.close()
 
-        # ---------------------------------------------------------
-        # 2. Memory Consumption Chart
-        # ---------------------------------------------------------
         if "Memory_Used_MB" in df_plot.columns:
             plt.figure(figsize=(9, 6))
             for algo in target_algos:

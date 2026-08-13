@@ -1,7 +1,13 @@
-experiment_name: "LineChart_Experiment"
-dataset_path: "data/retail.txt"
-min_supports: [0.7, 0.5, 0.3, 0.1, 0.05, 0.01]
-algorithms: 
-  - "Apriori"
-  - "FPGrowth"
-  - "ECLAT"
+experiments:
+  - name: "Extensible_Mining_Experiment"
+    dataset: "data/retail.txt"
+    algorithms:
+      - className: "core.algorithms.AprioriWrapper"
+        parameters:
+          minSupport: 0.1
+      - className: "core.algorithms.FPGrowthWrapper"
+        parameters:
+          minSupport: 0.1
+      - className: "core.algorithms.EclatWrapper"
+        parameters:
+          minSupport: 0.1

@@ -1,101 +1,98 @@
 package core;
 
-import ca.pfv.spmf.algorithms.frequentpatterns.apriori_simple.AlgoApriori;
-import ca.pfv.spmf.algorithms.frequentpatterns.eclat.AlgoEclat;
-import ca.pfv.spmf.algorithms.frequentpatterns.fpgrowth.AlgoFPGrowth;
-import ca.pfv.spmf.input.transaction_database_list_integers.TransactionDatabase;
-
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.IOException;
+import core.algorithms.IMiningAlgorithm;
 import java.lang.management.ManagementFactory;
 import java.util.HashMap;
 import java.util.Map;
-
-// Import the Sun-specific bean for thread-level allocation tracking
 import com.sun.management.ThreadMXBean;
+import java.io.File;
+import java.net.URL;
+import java.net.URLClassLoader;
 
 public class AlgorithmRunner {
 
     /**
-     * Executes a specific data mining algorithm and records its performance.
-     * Returns a Map containing the execution time, memory used, and itemsets mined.
+     * Executes any data mining algorithm dynamically using Java Reflection and Plugin Loading.
+     *
+     * @param className  The fully qualified class name (e.g., "core.algorithms.AprioriWrapper" or "StrangerTopK")
+     * @param classDir   The absolute directory path to the external .class file (null for internal algorithms)
+     * @param parameters The dynamic map of parameters for the algorithm
+     * @param inputPath  Path to the dataset
+     * @param outputPath Path to save the itemsets
+     * @return Metrics map for the CSV Writer
      */
-    public Map<String, Object> runAlgorithm(String algorithmName, String inputPath, String outputPath, double minSupport) {
-        System.out.println("\n* Initializing: " + algorithmName + " (Min Support: " + minSupport + ")");
+    public Map<String, Object> runAlgorithm(String className, String classDir, Map<String, Object> parameters, String inputPath, String outputPath) {
 
-        System.gc(); // Optional safeguard, though less critical now with ThreadMXBean
+        String shortName = className;
+        if (className.contains(".")) {
+            shortName = className.substring(className.lastIndexOf('.') + 1);
+        }
 
-        // 1. Setup ThreadMXBean to completely isolate memory tracking from the GC
+        System.out.println("\n* Initializing: " + shortName + " (Parameters: " + parameters + ")");
+        System.gc();
+
         ThreadMXBean threadBean = (ThreadMXBean) ManagementFactory.getThreadMXBean();
-        long threadId = Thread.currentThread().getId();
+        long threadId = Thread.currentThread().threadId();
         long startMemory = threadBean.getThreadAllocatedBytes(threadId);
 
-        // Start the Stopwatch
         long startTime = System.currentTimeMillis();
+        long itemsetCount = 0;
 
         try {
-            // The Execution Switchboard
-            if (algorithmName.equalsIgnoreCase("Apriori")) {
-                AlgoApriori apriori = new AlgoApriori();
-                apriori.runAlgorithm(minSupport, inputPath, outputPath);
-            }
-            else if (algorithmName.equalsIgnoreCase("FPGrowth")) {
-                AlgoFPGrowth fpGrowth = new AlgoFPGrowth();
-                fpGrowth.runAlgorithm(inputPath, outputPath, minSupport);
-            }
-            else if (algorithmName.equalsIgnoreCase("ECLAT")) {
-                TransactionDatabase database = new TransactionDatabase();
-                database.loadFile(inputPath);
+            Class<?> clazz;
 
-                AlgoEclat eclat = new AlgoEclat();
-                eclat.runAlgorithm(outputPath, database, minSupport, false);
-            }
-            else {
-                System.out.println("Error: Algorithm '" + algorithmName + "' is not supported yet.");
-                return null;
+            if (classDir != null && !classDir.trim().isEmpty()) {
+                // Load from an external folder provided by the user
+                File file = new File(classDir);
+                URL url = file.toURI().toURL();
+                URLClassLoader loader = new URLClassLoader(
+                        new URL[]{url},
+                        this.getClass().getClassLoader() // Share the IMiningAlgorithm interface
+                );
+                clazz = Class.forName(className, true, loader);
+            } else {
+                // Load standard internal algorithms from the jar
+                clazz = Class.forName(className);
             }
 
-            // Stop the Stopwatch
-            long endTime = System.currentTimeMillis();
-            long executionTime = endTime - startTime;
+            IMiningAlgorithm algorithm = (IMiningAlgorithm) clazz.getDeclaredConstructor().newInstance();
+            itemsetCount = algorithm.run(parameters, inputPath, outputPath);
 
-            // 2. Calculate ThreadMXBean Memory
-            long endMemory = threadBean.getThreadAllocatedBytes(threadId);
-            long memoryUsedBytes = endMemory - startMemory;
-
-            // We no longer need Math.max() because allocated bytes strictly increases
-            double memoryUsedMB = memoryUsedBytes / (1024.0 * 1024.0);
-
-            // 3. Count the number of mined itemsets
-            long itemsetCount = 0;
-            try (BufferedReader reader = new BufferedReader(new FileReader(outputPath))) {
-                while (reader.readLine() != null) {
-                    itemsetCount++;
-                }
+        } catch (ClassNotFoundException e) {
+            System.err.println("CRITICAL: Could not find algorithm class: " + className);
+            if (classDir != null) {
+                System.err.println("Make sure the .class file is inside the directory: " + classDir);
             }
-
-            System.out.println("    [-] Execution Time: " + executionTime + " ms");
-            System.out.printf("    [-] Memory Consumed: %.2f MB\n", memoryUsedMB);
-            System.out.println("    [-] Itemsets Found: " + itemsetCount);
-
-            // Package the results to send to CSV Writer
-            Map<String, Object> metrics = new HashMap<>();
-            metrics.put("algorithm", algorithmName);
-            metrics.put("executionTime", executionTime);
-            metrics.put("memoryMB", memoryUsedMB);
-            metrics.put("itemsetCount", itemsetCount);
-
-            return metrics;
-
-        } catch (IOException e) {
-            System.err.println("CRITICAL: Failed to process dataset file.");
-            System.err.println(e.getMessage());
             return null;
         } catch (Exception e) {
             System.err.println("CRITICAL: Algorithm execution failed.");
-            System.err.println(e.getMessage());
+            e.printStackTrace();
             return null;
         }
+
+        long endTime = System.currentTimeMillis();
+        long executionTime = endTime - startTime;
+
+        long endMemory = threadBean.getThreadAllocatedBytes(threadId);
+        long memoryUsedBytes = endMemory - startMemory;
+        double memoryUsedMB = memoryUsedBytes / (1024.0 * 1024.0);
+
+        System.out.println("    [-] Execution Time: " + executionTime + " ms");
+        System.out.printf("    [-] Memory Consumed: %.2f MB\n", memoryUsedMB);
+        System.out.println("    [-] Itemsets Found: " + itemsetCount);
+
+        Map<String, Object> metrics = new HashMap<>();
+        metrics.put("algorithm", shortName);
+        metrics.put("executionTime", executionTime);
+        metrics.put("memoryMB", memoryUsedMB);
+        metrics.put("itemsetCount", itemsetCount);
+
+        if (parameters.containsKey("minSupport")) {
+            metrics.put("MinSupport", Double.parseDouble(parameters.get("minSupport").toString()));
+        } else {
+            metrics.put("MinSupport", 0.0);
+        }
+
+        return metrics;
     }
 }

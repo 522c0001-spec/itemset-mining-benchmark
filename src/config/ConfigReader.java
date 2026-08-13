@@ -4,59 +4,61 @@ import core.AlgorithmRunner;
 import org.yaml.snakeyaml.Yaml;
 import utils.CSVWriter;
 
-import java.io.FileInputStream;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 
 public class ConfigReader {
     public static void main(String[] args) {
+        System.out.println("=====================================");
+        System.out.println("BENCHMARK PLATFORM - STARTING BATCH RUN");
+        System.out.println("=====================================");
+
         Yaml yaml = new Yaml();
-
-        try (InputStream inputStream = new FileInputStream("config.yaml")) {
-            Map<String, Object> config = yaml.load(inputStream);
-            String experimentName = (String) config.get("experiment_name");
-            String datasetPath = (String) config.get("dataset_path");
-            
-            // FIX 1: Read a list of supports instead of a single Double
-            @SuppressWarnings("unchecked")
-            List<Double> minSupports = (List<Double>) config.get("min_supports");
+        try (InputStream in = Files.newInputStream(Paths.get("config.yaml"))) {
+            Map<String, Object> config = yaml.load(in);
 
             @SuppressWarnings("unchecked")
-            List<String> algorithms = (List<String>) config.get("algorithms");
-
-            System.out.println("=====================================");
-            System.out.println("BENCHMARK PLATFORM - STARTING BATCH RUN");
-            System.out.println("=====================================");
+            List<Map<String, Object>> experiments = (List<Map<String, Object>>) config.get("experiments");
 
             AlgorithmRunner runner = new AlgorithmRunner();
-            CSVWriter writer = new CSVWriter();
-            String rawOutputPath = "output/raw_itemsets.txt";
+            CSVWriter csvWriter = new CSVWriter(); // Assuming your CSVWriter is fully intact
 
-            // FIX 2: Nested loop to run all algorithms across all supports
-            for (Double minSupport : minSupports) {
-                for (String algo : algorithms) {
-                    System.out.println("Testing " + algo + " at Support: " + minSupport);
-                    
-                    Map<String, Object> metrics = runner.runAlgorithm(algo, datasetPath, rawOutputPath, minSupport);
+            for (Map<String, Object> experiment : experiments) {
+                String experimentName = (String) experiment.get("name");
+                String dataset = (String) experiment.get("dataset");
+                String outputPath = "output/raw_itemsets.txt";
+
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> algorithms = (List<Map<String, Object>>) experiment.get("algorithms");
+
+                for (Map<String, Object> algoConfig : algorithms) {
+
+                    String className = (String) algoConfig.get("className");
+
+                    // Safely extract classDir (will be null if not defined in YAML)
+                    String classDir = (String) algoConfig.get("classDir");
+
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> parameters = (Map<String, Object>) algoConfig.get("parameters");
+
+                    // Execute via the updated reflection engine
+                    Map<String, Object> metrics = runner.runAlgorithm(className, classDir, parameters, dataset, outputPath);
 
                     if (metrics != null) {
-                        // FIX 3: Inject MinSupport and Algorithm so CSVWriter catches it
-                        metrics.put("Algorithm", algo);
-                        metrics.put("MinSupport", minSupport);
-                        
-                        writer.writeResult(experimentName, datasetPath, metrics);
+                        csvWriter.writeResult(experimentName, dataset, metrics);
                     }
                 }
             }
-
             System.out.println("\n=====================================");
             System.out.println("BENCHMARK COMPLETE. Check output/results.csv");
             System.out.println("=====================================");
 
         } catch (Exception e) {
-            System.err.println("CRITICAL ERROR: Failure to execute platform.");
-            System.err.println("Details: " + e.getMessage());
+            System.err.println("CRITICAL: Failed to read config.yaml");
+            e.printStackTrace();
         }
     }
 }
